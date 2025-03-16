@@ -1,20 +1,39 @@
 package org.eski
 
+import Lesson
 import runCommand
+import java.awt.Color
+import java.awt.Font
+import java.awt.RenderingHints
+import java.awt.image.BufferedImage
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.nio.file.Paths
+import javax.imageio.ImageIO
 
 
 fun main() {
-  generateLessonFileKotlin(Lesson.all[1])
+  val lesson = Lesson.all[0]
+  generateLessonFilesKotlin(lesson)
 }
 
-fun generateLessonFileKotlin(lesson: Lesson) {
+fun generateLessonFilesKotlin(lesson: Lesson) {
   println("generate lesson: $lesson")
 
   val projectDir = Paths.get("").toAbsolutePath().toString()
+  File("$projectDir/lessons/images").mkdirs()
+  val imageOutputPath = "$projectDir/lessons/images/${lesson.fileName.replace(".mp3", ".png")}"
+
+  val subtext = "\tThis lesson helps you learn to identify notes by ear. It is designed to play a note every ${lesson.promptSpacingSeconds} " +
+      "seconds in order to help you learn what each note sounds like. You can keep the audio playing in the background to rehearse throughout the day. " +
+      "Try to identify each note before it is spoken. Each lesson will get a tiny bit more difficult. " +
+      "\tThis method for learning perfect pitch involves keeping the feeling of each note in your mind for as long as possible each day. " +
+      "Try to identify the common feature between the same note played in different octaves and by different instruments."
+      "\nYou can find the playlist of all lessons in order on my channel page. " +
+      "There will be links in the description for more music learning content and apps."
+
+  generateLessonImage(lesson, imageOutputPath, subtext)
 
   val tempFiles = listOf(
     "$projectDir/lessons/temp-out-0.mp3",
@@ -26,7 +45,6 @@ fun generateLessonFileKotlin(lesson: Lesson) {
     val inputFiles = mutableListOf<Pair<String, Int>>()
 
     val note = lesson.notes.random()
-    println("note: $note")
     val instrument = lesson.instruments.random()
 
     val letterFileName = if (note.natural()) {
@@ -140,5 +158,109 @@ private fun writeSilenceFrames(outputStream: FileOutputStream, seconds: Int) {
   // Write the silent frames
   for (i in 0 until totalFrames) {
     outputStream.write(silentFrame)
+  }
+}
+
+/**
+ * Generates a PNG image file for a lesson with information about the lesson
+ *
+ * @param lesson The lesson to generate an image for
+ * @param outputPath The path where the image file should be saved
+ * @param subtext Additional text to display as a smaller paragraph
+ * @param width Image width in pixels (default 1200)
+ * @param height Image height in pixels (default 630)
+ * @return true if the image was successfully generated, false otherwise
+ */
+fun generateLessonImage(
+  lesson: Lesson,
+  outputPath: String,
+  subtext: String,
+  width: Int = 1200,
+  height: Int = 630
+): Boolean {
+  try {
+    // Create a new image with black background
+    val image = BufferedImage(width, height, BufferedImage.TYPE_INT_RGB)
+    val g2d = image.createGraphics()
+
+    // Enable anti-aliasing for smoother text
+    g2d.setRenderingHint(
+      RenderingHints.KEY_TEXT_ANTIALIASING,
+      RenderingHints.VALUE_TEXT_ANTIALIAS_ON
+    )
+
+    // Set background to black
+    g2d.color = Color.BLACK
+    g2d.fillRect(0, 0, width, height)
+
+    // Set text color to white
+    g2d.color = Color.WHITE
+
+    // Draw the lesson number
+    g2d.font = Font("Arial", Font.BOLD, 60)
+    val lessonTitle = "Passive Pitch - Lesson ${lesson.levelIndex}"
+    val titleMetrics = g2d.fontMetrics
+    val titleX = (width - titleMetrics.stringWidth(lessonTitle)) / 2
+    g2d.drawString(lessonTitle, titleX, 120)
+
+    // Draw the instruments list
+    g2d.font = Font("Arial", Font.PLAIN, 40)
+    val instrumentsText = "Instruments: ${lesson.instruments.joinToString(", ")}"
+    val instrumentsMetrics = g2d.fontMetrics
+    val instrumentsX = (width - instrumentsMetrics.stringWidth(instrumentsText)) / 2
+    g2d.drawString(instrumentsText, instrumentsX, 220)
+
+    // Draw the notes list
+    val notesText = "Notes: ${lesson.notes.joinToString(", ") { it.toString() }}"
+    val notesMetrics = g2d.fontMetrics
+    val notesX = (width - notesMetrics.stringWidth(notesText)) / 2
+    g2d.drawString(notesText, notesX, 280)
+
+    // Draw the subtext paragraph
+    if (subtext.isNotEmpty()) {
+      g2d.font = Font("Arial", Font.ITALIC, 24)
+
+      // Word wrap for the subtext
+      val words = subtext.split(" ")
+      val lineHeight = g2d.fontMetrics.height
+      var currentLine = ""
+      var yPosition = 380
+
+      for (word in words) {
+        val testLine = if (currentLine.isEmpty()) word else "$currentLine $word"
+        val testWidth = g2d.fontMetrics.stringWidth(testLine)
+
+        if (testWidth > width - 100) {
+          // Draw the current line and start a new one
+          val lineX = (width - g2d.fontMetrics.stringWidth(currentLine)) / 2
+          g2d.drawString(currentLine, lineX, yPosition)
+          currentLine = word
+          yPosition += lineHeight
+        } else {
+          currentLine = testLine
+        }
+      }
+
+      // Draw the last line
+      if (currentLine.isNotEmpty()) {
+        val lineX = (width - g2d.fontMetrics.stringWidth(currentLine)) / 2
+        g2d.drawString(currentLine, lineX, yPosition)
+      }
+    }
+
+    // Clean up resources
+    g2d.dispose()
+
+    // Save the image
+    val outputFile = File(outputPath)
+    ImageIO.write(image, "png", outputFile)
+
+    println("Successfully generated lesson image: $outputPath")
+    return true
+
+  } catch (e: Exception) {
+    println("Error generating lesson image: ${e.message}")
+    e.printStackTrace()
+    return false
   }
 }

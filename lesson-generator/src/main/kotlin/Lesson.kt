@@ -1,8 +1,3 @@
-package org.eski
-
-import Instrument
-import Note
-
 data class Lesson(
   val levelIndex: Int,
   val notes: List<Note>,
@@ -29,8 +24,8 @@ data class Lesson(
           notes = listOf(Note.c4, Note.a4, Note.f4),
           instruments = listOf(Instrument.piano),
           promptSpacingSeconds = 60,
-          promptAnswerSpacingSeconds = 5,
-          totalPrompts = 60,
+          promptAnswerSpacingSeconds = 3,
+          totalPrompts = 100,
         )
       )
 
