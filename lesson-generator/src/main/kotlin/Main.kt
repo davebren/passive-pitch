@@ -25,13 +25,14 @@ fun generateLessonFilesKotlin(lesson: Lesson) {
   File("$projectDir/lessons/images").mkdirs()
   val imageOutputPath = "$projectDir/lessons/images/${lesson.fileName.replace(".mp3", ".png")}"
 
-  val subtext = "\tThis lesson helps you learn to identify notes by ear. It is designed to play a note every ${lesson.promptSpacingSeconds} " +
+  val subtext = "    This lesson will help you learn to identify notes by ear. It is designed to play a note every ${lesson.promptSpacingSeconds} " +
       "seconds in order to help you learn what each note sounds like. You can keep the audio playing in the background to rehearse throughout the day. " +
-      "Try to identify each note before it is spoken. Each lesson will get a tiny bit more difficult. " +
-      "\tThis method for learning perfect pitch involves keeping the feeling of each note in your mind for as long as possible each day. " +
-      "Try to identify the common feature between the same note played in different octaves and by different instruments."
-      "\nYou can find the playlist of all lessons in order on my channel page. " +
-      "There will be links in the description for more music learning content and apps."
+      "Try to identify each note before it is spoken. Each lesson will get a tiny bit more difficult." +
+      "<br>    The passive pitch method involves consistent rehearsal and holding the memory of each note in your mind for as long as possible each day. " +
+      "Try to identify the common feature between the same note played in different octaves and by different instruments. " +
+      "It will be most effective when combined with active forms of perfect pitch training." +
+      "<br>   You can find the playlist of all lessons in order on my channel page. " +
+      "There will be links in the description for more music learning content and apps. Good luck on you perfect pitch journey!"
 
   generateLessonImage(lesson, imageOutputPath, subtext)
 
@@ -166,7 +167,7 @@ private fun writeSilenceFrames(outputStream: FileOutputStream, seconds: Int) {
  *
  * @param lesson The lesson to generate an image for
  * @param outputPath The path where the image file should be saved
- * @param subtext Additional text to display as a smaller paragraph
+ * @param subtext Additional text to display as a smaller paragraph, can include \t for tabs and \n for newlines
  * @param width Image width in pixels (default 1200)
  * @param height Image height in pixels (default 630)
  * @return true if the image was successfully generated, false otherwise
@@ -201,50 +202,67 @@ fun generateLessonImage(
     val lessonTitle = "Passive Pitch - Lesson ${lesson.levelIndex}"
     val titleMetrics = g2d.fontMetrics
     val titleX = (width - titleMetrics.stringWidth(lessonTitle)) / 2
-    g2d.drawString(lessonTitle, titleX, 120)
+    g2d.drawString(lessonTitle, titleX, 80)
 
     // Draw the instruments list
     g2d.font = Font("Arial", Font.PLAIN, 40)
     val instrumentsText = "Instruments: ${lesson.instruments.joinToString(", ")}"
     val instrumentsMetrics = g2d.fontMetrics
     val instrumentsX = (width - instrumentsMetrics.stringWidth(instrumentsText)) / 2
-    g2d.drawString(instrumentsText, instrumentsX, 220)
+    g2d.drawString(instrumentsText, instrumentsX, 160)
 
     // Draw the notes list
     val notesText = "Notes: ${lesson.notes.joinToString(", ") { it.toString() }}"
     val notesMetrics = g2d.fontMetrics
     val notesX = (width - notesMetrics.stringWidth(notesText)) / 2
-    g2d.drawString(notesText, notesX, 280)
+    g2d.drawString(notesText, notesX, 220)
 
-    // Draw the subtext paragraph
+    // Draw the subtext paragraph with formatting support
     if (subtext.isNotEmpty()) {
       g2d.font = Font("Arial", Font.ITALIC, 24)
 
-      // Word wrap for the subtext
-      val words = subtext.split(" ")
+      // Constants for formatting
+      val tabSize = 40 // Pixels for a tab indent
       val lineHeight = g2d.fontMetrics.height
-      var currentLine = ""
-      var yPosition = 380
+      val paragraphSpacing = lineHeight / 2 // Extra space between paragraphs
+      val marginX = 50 // Left/right margin
+      val textWidth = width - (marginX * 2) // Maximum text width
 
-      for (word in words) {
-        val testLine = if (currentLine.isEmpty()) word else "$currentLine $word"
-        val testWidth = g2d.fontMetrics.stringWidth(testLine)
+      // Split text into paragraphs
+      val paragraphs = subtext.split("<br>")
+      var yPosition = 300
 
-        if (testWidth > width - 100) {
-          // Draw the current line and start a new one
-          val lineX = (width - g2d.fontMetrics.stringWidth(currentLine)) / 2
-          g2d.drawString(currentLine, lineX, yPosition)
-          currentLine = word
-          yPosition += lineHeight
-        } else {
-          currentLine = testLine
+      for (paragraph in paragraphs) {
+        // Check if paragraph starts with a tab
+        val leftMargin = marginX
+        val processedParagraph = paragraph
+
+        // Process this paragraph with word wrapping
+        val words = processedParagraph.split(" ")
+        var currentLine = ""
+
+        for (word in words) {
+          val testLine = if (currentLine.isEmpty()) word else "$currentLine $word"
+          val testWidth = g2d.fontMetrics.stringWidth(testLine)
+
+          if (testWidth > textWidth - (leftMargin - marginX)) {
+            // Line is full, draw it and start a new one
+            g2d.drawString(currentLine, leftMargin, yPosition)
+            currentLine = word
+            yPosition += lineHeight
+          } else {
+            currentLine = testLine
+          }
         }
-      }
 
-      // Draw the last line
-      if (currentLine.isNotEmpty()) {
-        val lineX = (width - g2d.fontMetrics.stringWidth(currentLine)) / 2
-        g2d.drawString(currentLine, lineX, yPosition)
+        // Draw the last line of the paragraph
+        if (currentLine.isNotEmpty()) {
+          g2d.drawString(currentLine, leftMargin, yPosition)
+          yPosition += lineHeight
+        }
+
+        // Add extra spacing between paragraphs
+        yPosition += paragraphSpacing
       }
     }
 
