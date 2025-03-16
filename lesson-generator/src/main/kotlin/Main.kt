@@ -1,30 +1,30 @@
 package org.eski
 
-import SilenceFile
 import runCommand
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.nio.file.Paths
 
 
 fun main() {
-  Lesson.all.forEach {
-    generateLessonFile(it)
-  }
+  generateLessonFileKotlin(Lesson.all[1])
 }
 
-fun generateLessonFile(lesson: Lesson) {
+fun generateLessonFileKotlin(lesson: Lesson) {
   println("generate lesson: $lesson")
-  val commandList = mutableListOf("cd ../")
-  commandList.add("source scripts/venv/bin/activate")
 
-  val silencesBetweenPrompts = SilenceFile.fromSeconds(lesson.promptSpacingSeconds)
-  val silencesBetweenAnswer = SilenceFile.fromSeconds(lesson.promptAnswerSpacingSeconds)
+  val projectDir = Paths.get("").toAbsolutePath().toString()
 
   val tempFiles = listOf(
-    "lessons/temp-out-0.mp3",
-    "lessons/temp-out-1.mp3"
+    "$projectDir/lessons/temp-out-0.mp3",
+    "$projectDir/lessons/temp-out-1.mp3"
   )
   var tempFileIndex: Int? = null
 
   for (promptIndex in 0 until lesson.totalPrompts) {
+    val inputFiles = mutableListOf<Pair<String, Int>>()
+
     val note = lesson.notes.random()
     println("note: $note")
     val instrument = lesson.instruments.random()
@@ -35,40 +35,24 @@ fun generateLessonFile(lesson: Lesson) {
 
     val noteFileName = "$letterFileName${note.octave}"
 
-    val noteFile = "audio-files/instruments/$instrument/$noteFileName.mp3"
-    val silenceFile = "audio-files/silence/10.mp3"
-    val letterFile = "audio-files/note-letters/$letterFileName.mp3"
+    val noteFile = "$projectDir/audio-files/instruments/$instrument/$noteFileName.mp3"
+    val letterFile = "$projectDir/audio-files/note-letters/$letterFileName.mp3"
 
-    val concatCommandBuilder = StringBuilder("python scripts/combine-audio.py -c ")
     tempFileIndex?.let {
-      concatCommandBuilder.append(tempFiles[it]).append(" ")
+      inputFiles.add(Pair(tempFiles[it], 0))
     }
+
     tempFileIndex = adjustTempFileIndex(tempFileIndex)
-    val tempFile = tempFiles[tempFileIndex]
+    val outputFile = tempFiles[tempFileIndex]
 
-    if (promptIndex > 0) {
-      silencesBetweenPrompts.forEach {
-        concatCommandBuilder.append(it.filepath).append(" ")
-      }
-    }
+    inputFiles.add(Pair(noteFile, lesson.promptAnswerSpacingSeconds))
+    inputFiles.add(Pair(letterFile, lesson.promptSpacingSeconds))
 
-    concatCommandBuilder.append(noteFile).append(" ")
-
-    silencesBetweenAnswer.forEach {
-      concatCommandBuilder.append(it.filepath).append(" ")
-    }
-
-    concatCommandBuilder.append(letterFile).append(" ")
-
-    concatCommandBuilder.append("-o $tempFile")
-
-    commandList.add(concatCommandBuilder.toString())
+    concatenateMp3Files(inputFiles, outputFile)
   }
 
-  tempFileIndex?.let { commandList.add("cp ${tempFiles[it]} lessons/${lesson.fileName}") }
-  tempFiles.forEach { commandList.add("rm $it") }
-  commandList.forEach { println(it) }
-  commandList.joinToString("; ").runCommand()
+  tempFileIndex?.let { "cp ${tempFiles[it]} lessons/${lesson.fileName}".runCommand() }
+  tempFiles.forEach { "rm $it".runCommand() }
 }
 
 private fun adjustTempFileIndex(startIndex: Int?): Int {
@@ -77,5 +61,84 @@ private fun adjustTempFileIndex(startIndex: Int?): Int {
     0 -> 1
     1 -> 0
     else -> throw IllegalArgumentException()
+  }
+}
+
+fun concatenateMp3Files(inputFilesWithSilence: List<Pair<String, Int>>, outputFilePath: String): Boolean {
+  if (inputFilesWithSilence.isEmpty()) {
+    println("Error: No input files provided")
+    return false
+  }
+
+  try {
+    val outputFile = File(outputFilePath)
+    val outputStream = FileOutputStream(outputFile)
+
+    for ((filePath, silenceSeconds) in inputFilesWithSilence) {
+      val file = File(filePath)
+      if (!file.exists() || !file.isFile) {
+        println("Error: Input file not found: $filePath")
+        outputStream.close()
+        return false
+      }
+
+      // Copy the audio file to the output
+      val inputStream = FileInputStream(file)
+      val buffer = ByteArray(8192)
+      var bytesRead: Int
+
+      while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+        outputStream.write(buffer, 0, bytesRead)
+      }
+
+      inputStream.close()
+
+      // Add silence directly after the file
+      if (silenceSeconds > 0) {
+        writeSilenceFrames(outputStream, silenceSeconds)
+      }
+    }
+
+    outputStream.close()
+    println("Successfully concatenated audio files with silence to: $outputFilePath")
+    return true
+
+  } catch (e: Exception) {
+    println("Error during MP3 concatenation: ${e.message}")
+    e.printStackTrace()
+    return false
+  }
+}
+
+/**
+ * Writes silent MP3 frames directly to the output stream
+ *
+ * @param outputStream the output stream to write to
+ * @param seconds the number of seconds of silence to write
+ */
+private fun writeSilenceFrames(outputStream: FileOutputStream, seconds: Int) {
+  // MP3 parameters
+  val sampleRate = 44100 // 44.1 kHz
+  val bitRate = 128000 // 128 kbps
+  val channels = 2 // stereo
+
+  // Calculate frame parameters
+  val frameSize = (144 * bitRate / sampleRate) // Frame size formula for MP3
+  val framesPerSecond = sampleRate / 1152 // 1152 samples per frame is standard for MPEG1 Layer 3
+  val totalFrames = framesPerSecond * seconds
+
+  // Create a silent MP3 frame (this is a simplified approach)
+  // A real silent frame would require proper MP3 frame headers and data
+  // For a proper implementation, you would use a library like LAME
+  val silentFrame = ByteArray(frameSize) { 0 }
+
+  // Set basic MP3 frame header (simplified)
+  // In a real implementation, this would be much more detailed
+  silentFrame[0] = 0xFF.toByte() // Frame sync (11 bits)
+  silentFrame[1] = 0xFB.toByte() // MPEG1, Layer 3, No CRC
+
+  // Write the silent frames
+  for (i in 0 until totalFrames) {
+    outputStream.write(silentFrame)
   }
 }

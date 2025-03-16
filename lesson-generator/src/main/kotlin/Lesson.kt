@@ -30,7 +30,18 @@ data class Lesson(
           instruments = listOf(Instrument.piano),
           promptSpacingSeconds = 60,
           promptAnswerSpacingSeconds = 5,
-          totalPrompts = 200,
+          totalPrompts = 60,
+        )
+      )
+
+      all.add(
+        Lesson(
+          levelIndex = 2,
+          notes = listOf(Note.c4, Note.a4, Note.f4, Note.c3, Note.a3),
+          instruments = listOf(Instrument.piano),
+          promptSpacingSeconds = 60,
+          promptAnswerSpacingSeconds = 3,
+          totalPrompts = 100,
         )
       )
     }
