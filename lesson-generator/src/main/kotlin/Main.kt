@@ -8,8 +8,10 @@ import runCommand
 
 
 fun main() {
-  val lesson = Lesson.all[0]
-  generateLessonFiles(lesson, keepOnlyVideo = true)
+//  val lesson = Lesson.all[0]
+//  generateLessonFiles(lesson, keepOnlyVideo = true)
+
+  Lesson.all.forEach { generateLessonFiles(it, keepOnlyVideo = true) }
 }
 
 fun generateLessonFiles(
