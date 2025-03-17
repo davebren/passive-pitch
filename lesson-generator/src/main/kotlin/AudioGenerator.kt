@@ -88,7 +88,7 @@ class AudioGenerator {
 
         // Add silence directly after the file
         if (silenceSeconds > 0) {
-          writeSilenceFrames(outputStream, silenceSeconds)
+          addSilence(outputStream, silenceSeconds)
         }
       }
 
@@ -104,7 +104,50 @@ class AudioGenerator {
   }
 
   /**
-   * Writes silent MP3 frames directly to the output stream
+   * Adds silence to the MP3 stream by creating a silent MP3 file and appending it
+   *
+   * @param outputStream the output stream to write to
+   * @param seconds the number of seconds of silence to write
+   */
+  private fun addSilence(outputStream: FileOutputStream, seconds: Int) {
+    try {
+      // Create a temporary silence MP3 file
+      val projectDir = Paths.get("").toAbsolutePath().toString()
+      val silenceFile = "$projectDir/silence_temp.mp3"
+
+      // Use ffmpeg to generate a silent MP3 file with the correct format
+      val ffmpegCommand = "ffmpeg -y -f lavfi -i anullsrc=r=44100:cl=stereo -t $seconds " +
+          "-ab 128k -acodec libmp3lame -f mp3 $silenceFile"
+
+      val process = Runtime.getRuntime().exec(ffmpegCommand)
+      process.waitFor()
+
+      // Read the silent MP3 file and write it to the output stream
+      val silenceFileObj = File(silenceFile)
+      if (silenceFileObj.exists()) {
+        val silenceInputStream = FileInputStream(silenceFileObj)
+        val buffer = ByteArray(8192)
+        var bytesRead: Int
+
+        while (silenceInputStream.read(buffer).also { bytesRead = it } != -1) {
+          outputStream.write(buffer, 0, bytesRead)
+        }
+
+        silenceInputStream.close()
+        silenceFileObj.delete() // Clean up temporary file
+      } else {
+        println("Failed to create silence file")
+      }
+    } catch (e: Exception) {
+      println("Error generating silence: ${e.message}")
+      e.printStackTrace()
+    }
+  }
+
+  /**
+   * Simplification of the previous writeSilenceFrames method
+   * This is a basic implementation that writes null bytes as silence
+   * For more accurate silence, use the addSilence method above
    *
    * @param outputStream the output stream to write to
    * @param seconds the number of seconds of silence to write
@@ -113,26 +156,21 @@ class AudioGenerator {
     // MP3 parameters
     val sampleRate = 44100 // 44.1 kHz
     val bitRate = 128000 // 128 kbps
-    val channels = 2 // stereo
 
-    // Calculate frame parameters
-    val frameSize = (144 * bitRate / sampleRate) // Frame size formula for MP3
-    val framesPerSecond = sampleRate / 1152 // 1152 samples per frame is standard for MPEG1 Layer 3
-    val totalFrames = framesPerSecond * seconds
+    // Calculate byte size for the duration
+    val bytesPerSecond = bitRate / 8
+    val totalBytes = bytesPerSecond * seconds
 
-    // Create a silent MP3 frame (this is a simplified approach)
-    // A real silent frame would require proper MP3 frame headers and data
-    // For a proper implementation, you would use a library like LAME
-    val silentFrame = ByteArray(frameSize) { 0 }
+    // Create a buffer for writing silence in chunks
+    val bufferSize = 8192
+    val buffer = ByteArray(bufferSize)
 
-    // Set basic MP3 frame header (simplified)
-    // In a real implementation, this would be much more detailed
-    silentFrame[0] = 0xFF.toByte() // Frame sync (11 bits)
-    silentFrame[1] = 0xFB.toByte() // MPEG1, Layer 3, No CRC
-
-    // Write the silent frames
-    for (i in 0 until totalFrames) {
-      outputStream.write(silentFrame)
+    // Write silence in chunks to avoid memory issues with large durations
+    var remainingBytes = totalBytes
+    while (remainingBytes > 0) {
+      val bytesToWrite = minOf(bufferSize, remainingBytes)
+      outputStream.write(buffer, 0, bytesToWrite)
+      remainingBytes -= bytesToWrite
     }
   }
 }
