@@ -22,6 +22,7 @@ fun generateLessonFiles(
   videoGenerator: VideoGenerator = VideoGenerator()
 ) {
   val imagePath = imageGenerator.generateLessonImage(lesson)
+  imageGenerator.generateYouTubeThumbnail(lesson)
   val audioPath = audioGenerator.generateAudioFile(lesson)
   videoGenerator.createVideoFromAudioAndImage(lesson)
 
