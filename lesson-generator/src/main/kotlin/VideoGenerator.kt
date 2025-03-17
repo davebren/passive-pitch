@@ -9,10 +9,9 @@ class VideoGenerator {
   /**
    * Creates an MP4 video file from an MP3 audio file and a PNG image file
    * This function uses FFmpeg which must be installed on the system and available in the PATH
+   * Optimized for static images by using a more efficient encoding approach
    *
-   * @param audioFilePath Path to the MP3 audio file
-   * @param imageFilePath Path to the PNG image file to use as a still frame
-   * @param outputFilePath Path where the output MP4 file should be saved
+   * @param lesson The lesson to create a video for
    * @param videoQuality Quality of the video output (0-51, where 0 is best quality), default is 23
    * @return true if the video was successfully created, false otherwise
    */
@@ -36,26 +35,23 @@ class VideoGenerator {
         return false
       }
 
-      // Build the FFmpeg command
-      // -loop 1: Loop the image
-      // -i [image]: Input image file
-      // -i [audio]: Input audio file
-      // -c:v libx264: Use H.264 codec for video
-      // -crf [quality]: Set constant rate factor (quality)
-      // -tune stillimage: Optimize for still image
-      // -c:a aac: Use AAC codec for audio
-      // -b:a 192k: Set audio bitrate
-      // -shortest: Finish encoding when the shortest input stream ends
-      // -pix_fmt yuv420p: Use YUV 4:2:0 pixel format (for compatibility)
+      // Build the FFmpeg command with optimizations for static images
+      // Key optimizations:
+      // 1. Using -framerate 1 to generate fewer frames from the input
+      // 2. Using -preset veryslow for better compression with static content
+      // 3. Using appropriate -g (keyframe interval) for static content
       val command = listOf(
         "ffmpeg",
         "-y", // Overwrite output file if it exists
         "-loop", "1",
+        "-framerate", "1", // Lower framerate for input since image is static
         "-i", imageFile.absolutePath,
         "-i", audioFile.absolutePath,
         "-c:v", "libx264",
         "-crf", videoQuality.toString(),
+        "-preset", "veryslow", // Slower encoding but better compression for static content
         "-tune", "stillimage",
+        "-g", "600", // Large GOP size since all frames are identical
         "-c:a", "aac",
         "-b:a", "192k",
         "-shortest",
