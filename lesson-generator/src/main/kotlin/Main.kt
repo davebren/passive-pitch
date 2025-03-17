@@ -11,7 +11,8 @@ fun main() {
 //  val lesson = Lesson.all[0]
 //  generateLessonFiles(lesson, keepOnlyVideo = true)
 
-  Lesson.all.forEach { generateLessonFiles(it, keepOnlyVideo = true) }
+  Lesson.all.slice(4 until Lesson.all.size).forEach { generateLessonFiles(it, keepOnlyVideo = true) }
+//  Lesson.all.forEach { generateLessonFiles(it, keepOnlyVideo = true) }
 }
 
 fun generateLessonFiles(

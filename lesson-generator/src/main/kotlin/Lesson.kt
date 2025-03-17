@@ -61,6 +61,26 @@ data class Lesson(
           totalPrompts = 100,
         )
       )
+      all.add(
+        Lesson(
+          levelIndex = 5,
+          notes = listOf(Note.c4, Note.a4, Note.f4, Note.f3, Note.a3),
+          instruments = listOf(Instrument.piano),
+          promptSpacingSeconds = 60,
+          promptAnswerSpacingSeconds = 3,
+          totalPrompts = 100,
+        )
+      )
+      all.add(
+        Lesson(
+          levelIndex = 6,
+          notes = listOf(Note.c4, Note.a4, Note.f4, Note.e0),
+          instruments = listOf(Instrument.piano),
+          promptSpacingSeconds = 60,
+          promptAnswerSpacingSeconds = 3,
+          totalPrompts = 100,
+        )
+      )
     }
   }
 }
