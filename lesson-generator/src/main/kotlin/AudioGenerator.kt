@@ -4,11 +4,12 @@ import java.io.FileOutputStream
 import java.nio.file.Paths
 
 class AudioGenerator {
-  fun generateAudioFile(lesson: Lesson) {
+  fun generateAudioFile(lesson: Lesson): String {
     println("generate lesson: $lesson")
 
     val projectDir = Paths.get("").toAbsolutePath().toString()
-    File("$projectDir/lessons/images").mkdirs()
+    File("$projectDir/lessons").mkdirs()
+    val outputFilePath = "$projectDir/lessons/${lesson.fileName}"
 
     val tempFiles = listOf(
       "$projectDir/lessons/temp-out-0.mp3",
@@ -44,8 +45,9 @@ class AudioGenerator {
       concatenateMp3Files(inputFiles, outputFile)
     }
 
-    tempFileIndex?.let { "cp ${tempFiles[it]} lessons/${lesson.fileName}".runCommand() }
+    tempFileIndex?.let { "cp ${tempFiles[it]} $outputFilePath".runCommand() }
     tempFiles.forEach { "rm $it".runCommand() }
+    return outputFilePath
   }
 
   private fun adjustTempFileIndex(startIndex: Int?): Int {

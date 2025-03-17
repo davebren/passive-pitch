@@ -8,7 +8,7 @@ import javax.imageio.ImageIO
 
 class ImageGenerator {
 
-  fun generateLessonImage(lesson: Lesson) {
+  fun generateLessonImage(lesson: Lesson): String {
     val projectDir = Paths.get("").toAbsolutePath().toString()
     File("$projectDir/lessons").mkdirs()
     val imageOutputPath = "$projectDir/lessons/${lesson.fileName.replace(".mp3", ".png")}"
@@ -23,6 +23,7 @@ class ImageGenerator {
         "There will be links in the description for more music learning content and apps. Good luck on you perfect pitch journey!"
 
     generateLessonImage(lesson, imageOutputPath, subtext)
+    return imageOutputPath
   }
 
   /**
