@@ -1,33 +1,31 @@
 import java.io.File
-import javazoom.jl.converter.Converter
+import java.io.ByteArrayInputStream
 import javax.sound.sampled.*
-import java.nio.file.Files
 import java.nio.file.Paths
 import kotlin.math.pow
-
-
+import kotlin.math.min
 
 // Example usage
 fun main(args: Array<String>) {
-  val generator = SfzSampleMp3Generator()
+  val generator = SfzSampleWavGenerator()
 
   val projectDir = Paths.get("").toAbsolutePath().toString()
   val sfzPath = File("$projectDir/audio-files/sfz/piano-kawai/map.sfz").absolutePath
 
   val outputDir = File("$projectDir/audio-files/instruments/piano-kawai").absolutePath
 
-  generator.generateMp3NotesFromSfz(sfzPath, outputDir, 21..108)
+  generator.generateWavNotesFromSfz(sfzPath, outputDir, 21..108)
 }
 
-class SfzSampleMp3Generator {
+class SfzSampleWavGenerator {
 
   /**
-   * Generates MP3 files for each semitone from an SFZ file and its WAV samples
+   * Generates WAV files for each semitone from an SFZ file and its WAV samples
    * @param sfzFilePath Path to the SFZ file
-   * @param outputDir Directory to save generated MP3 files (defaults to same directory as SFZ)
+   * @param outputDir Directory to save generated WAV files (defaults to same directory as SFZ)
    * @param noteRange Range of MIDI notes to generate (default: 21-108, piano range)
    */
-  fun generateMp3NotesFromSfz(
+  fun generateWavNotesFromSfz(
     sfzFilePath: String,
     outputDir: String = File(sfzFilePath).parent,
     noteRange: IntRange = 21..108
@@ -41,21 +39,39 @@ class SfzSampleMp3Generator {
     val sfzContent = sfzFile.readText()
     val sfzRegions = parseSfzRegions(sfzContent)
 
+    if (sfzRegions.isEmpty()) {
+      println("Warning: No valid regions found in SFZ file")
+      return
+    }
+
+    // Debug: Print all found regions
+    println("Found ${sfzRegions.size} regions in SFZ file:")
+    sfzRegions.forEach { region ->
+      println("Sample: ${region.samplePath}, Root: ${region.rootKey}, Range: ${region.loKey}-${region.hiKey}")
+    }
+
     // Create output directory if it doesn't exist
     val outputDirectory = File(outputDir)
     if (!outputDirectory.exists()) {
       outputDirectory.mkdirs()
     }
 
-    // Generate MP3 for each MIDI note in the range
+    // Generate WAV for each MIDI note in the range
     for (midiNote in noteRange) {
-      val region = findBestRegionForNote(sfzRegions, midiNote)
-      if (region != null) {
-        generateMp3ForNote(region, midiNote, sfzFile.parent, outputDirectory)
+      try {
+        val region = findBestRegionForNote(sfzRegions, midiNote)
+        if (region != null) {
+          generateWavForNote(region, midiNote, sfzFile.parent, outputDirectory)
+        } else {
+          println("No suitable region found for MIDI note $midiNote")
+        }
+      } catch (e: Exception) {
+        println("Error generating WAV for MIDI note $midiNote: ${e.message}")
+        e.printStackTrace()
       }
     }
 
-    println("MP3 generation complete. Files saved to: ${outputDirectory.absolutePath}")
+    println("WAV generation complete. Files saved to: ${outputDirectory.absolutePath}")
   }
 
   /**
@@ -140,9 +156,9 @@ class SfzSampleMp3Generator {
   }
 
   /**
-   * Generates MP3 file for a specific MIDI note using the given region
+   * Generates WAV file for a specific MIDI note using the given region
    */
-  fun generateMp3ForNote(
+  fun generateWavForNote(
     region: SfzRegion,
     midiNote: Int,
     sfzDirectory: String,
@@ -154,31 +170,36 @@ class SfzSampleMp3Generator {
       return
     }
 
+    println("Processing MIDI note $midiNote using sample: ${sampleFile.absolutePath}")
+    println("Root key: ${region.rootKey}, Semitone difference: ${midiNote - region.rootKey}")
+
     // Calculate pitch shift ratio
     val semitonesDifference = midiNote - region.rootKey
     val pitchShiftRatio = 2.0.pow(semitonesDifference / 12.0)
+    println("Pitch shift ratio: $pitchShiftRatio")
 
-    // Create temporary WAV file for the pitch-shifted sample
-    val tempWavFile = File.createTempFile("pitch_shifted_", ".wav")
+    // Generate output file path
+    val noteName = midiNoteToName(midiNote)
+    val wavFile = File(outputDirectory, "${noteName}_${midiNote}.wav")
 
     try {
-      // Pitch shift the sample
-      pitchShiftSample(sampleFile.absolutePath, tempWavFile.absolutePath, pitchShiftRatio)
+      // Pitch shift the sample directly to the final WAV file
+      pitchShiftSample(sampleFile.absolutePath, wavFile.absolutePath, pitchShiftRatio)
 
-      // Convert to MP3
-      val noteName = midiNoteToName(midiNote)
-      val mp3File = File(outputDirectory, "${noteName}_${midiNote}.mp3")
-      convertWavToMp3(tempWavFile.absolutePath, mp3File.absolutePath)
-
-      println("Generated MP3 for note $noteName (MIDI: $midiNote)")
-    } finally {
-      // Clean up temp file
-      tempWavFile.delete()
+      // Verify the file was created and has content
+      if (wavFile.exists() && wavFile.length() > 0) {
+        println("Successfully generated WAV for note $noteName (MIDI: $midiNote) - Size: ${wavFile.length()} bytes")
+      } else {
+        println("Error: Generated WAV file is empty or doesn't exist")
+      }
+    } catch (e: Exception) {
+      println("Error processing sample for note $midiNote: ${e.message}")
+      e.printStackTrace()
     }
   }
 
   /**
-   * Pitch shifts a WAV sample by the given ratio
+   * Pitch shifts a WAV sample by the given ratio with improved handling
    */
   fun pitchShiftSample(inputWavPath: String, outputWavPath: String, pitchRatio: Double) {
     // Open input audio file
@@ -186,48 +207,56 @@ class SfzSampleMp3Generator {
     val audioInputStream = AudioSystem.getAudioInputStream(inputFile)
     val format = audioInputStream.format
 
-    // Read audio data
-    val frameSize = format.frameSize
+    println("Input audio format: $format")
+
+    // Read all audio data
     val inputBytes = audioInputStream.readAllBytes()
+    println("Read ${inputBytes.size} bytes from input WAV")
+
+    val frameSize = format.frameSize
     val inputFrames = inputBytes.size / frameSize
 
     // Calculate output size
     val outputFrames = (inputFrames / pitchRatio).toInt()
     val outputBytes = ByteArray(outputFrames * frameSize)
 
-    // Simple resampling (for more complex instruments, a proper time-stretching
-    // algorithm would be better, but this works for basic pitch shifting)
+    println("Input frames: $inputFrames, Output frames: $outputFrames")
+
+    // Simple resampling with proper bounds checking
     for (outFrame in 0 until outputFrames) {
       val inFrame = (outFrame * pitchRatio).toInt()
-      if (inFrame < inputFrames) {
+      val inOffset = inFrame * frameSize
+      val outOffset = outFrame * frameSize
+
+      if (inOffset + frameSize <= inputBytes.size && outOffset + frameSize <= outputBytes.size) {
         System.arraycopy(
-          inputBytes, inFrame * frameSize,
-          outputBytes, outFrame * frameSize,
+          inputBytes, inOffset,
+          outputBytes, outOffset,
           frameSize
         )
       }
     }
 
-    // Write output file
+    println("Processed ${outputBytes.size} bytes for output WAV")
+
+    // Write output file with explicitly constructed AudioInputStream
     val outputAis = AudioInputStream(
-      outputBytes.inputStream(),
+      ByteArrayInputStream(outputBytes),
       format,
       outputFrames.toLong()
     )
 
-    AudioSystem.write(outputAis, AudioFileFormat.Type.WAVE, File(outputWavPath))
-
-    // Close streams
-    audioInputStream.close()
-    outputAis.close()
-  }
-
-  /**
-   * Converts a WAV file to MP3 using JavaZoom JLayer
-   */
-  fun convertWavToMp3(wavFilePath: String, mp3FilePath: String) {
-    val converter = Converter()
-    converter.convert(wavFilePath, mp3FilePath)
+    try {
+      val written = AudioSystem.write(outputAis, AudioFileFormat.Type.WAVE, File(outputWavPath))
+      println("Wrote $written bytes to output WAV file")
+    } catch (e: Exception) {
+      println("Error writing WAV file: ${e.message}")
+      throw e
+    } finally {
+      // Close streams
+      outputAis.close()
+      audioInputStream.close()
+    }
   }
 
   /**
