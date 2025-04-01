@@ -17,11 +17,20 @@ class AudioGenerator {
     )
     var tempFileIndex: Int? = null
 
+    val octaveCount = lesson.notes.map { it.octave }.distinct().size
+    var lastOctavePlayed: Int? = null
+
     for (promptIndex in 0 until lesson.totalPrompts) {
       val inputFiles = mutableListOf<Pair<String, Int>>()
 
-      val note = lesson.notes.random()
+      var note = lesson.notes.random()
+      if (octaveCount > 1) {
+        while (note.octave == lastOctavePlayed) {
+          note = lesson.notes.random()
+        }
+      }
       val instrument = lesson.instruments.random()
+
 
       val letterFileName = if (note.natural()) {
         "${note.nameo[0].lowercaseChar()}"
@@ -43,6 +52,7 @@ class AudioGenerator {
       inputFiles.add(Pair(letterFile, lesson.promptSpacingSeconds))
 
       concatenateMp3Files(inputFiles, outputFile)
+      lastOctavePlayed = note.octave
     }
 
     tempFileIndex?.let { "cp ${tempFiles[it]} $outputFilePath".runCommand() }
