@@ -5,7 +5,6 @@ import javax.sound.sampled.AudioInputStream
 import javax.sound.sampled.AudioSystem
 import kotlin.math.pow
 import kotlin.math.floor
-import kotlin.time.Duration
 import kotlin.time.DurationUnit
 import kotlin.time.toDuration
 
@@ -14,13 +13,19 @@ fun main(args: Array<String>) {
   val mp3Converter = WavToMp3Converter()
 
   val projectDir = Paths.get("").toAbsolutePath().toString()
-  val sfzPath = File("$projectDir/audio-files/sfz/piano-yamaha/map.sfz").absolutePath
-  val wavOutputDir = File("$projectDir/audio-files/instruments/piano-yamaha/wav").absolutePath
-  val mp3OutputDir = File("$projectDir/audio-files/instruments/piano-yamaha/mp3-128").absolutePath
+  val sfzDir = File("$projectDir/audio-files/sfz")
+  val instrumentDirs = sfzDir.listFiles()?.filter { it.isDirectory }
+  instrumentDirs?.forEach { instrumentDir ->
+    println(instrumentDir.absolutePath)
 
-  generator.generateWavNotesFromSfz(sfzPath, wavOutputDir, Note.a0, Note.c8)
-  mp3Converter.generateFiles(wavOutputDir, mp3OutputDir, 5.toDuration(DurationUnit.SECONDS), 128)
 
+    val sfzPath = File("${instrumentDir.absolutePath}/map.sfz").absolutePath
+    val wavOutputDir = File("$projectDir/audio-files/instruments/${instrumentDir.name}/wav").absolutePath
+    val mp3OutputDir = File("$projectDir/audio-files/instruments/${instrumentDir.name}/mp3-128").absolutePath
+
+    generator.generateWavNotesFromSfz(sfzPath, wavOutputDir, Note.a0, Note.c8)
+    mp3Converter.generateFiles(wavOutputDir, mp3OutputDir, 5.toDuration(DurationUnit.SECONDS), 128)
+  }
 }
 
 class SfzSampleWavGenerator {
