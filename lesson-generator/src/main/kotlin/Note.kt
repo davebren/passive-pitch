@@ -164,6 +164,10 @@ enum class Note(
     UnnaturalType.flat -> nameFlat
   }
 
+  fun filename() = if (natural()) {
+    "${nameo[0].lowercaseChar()}${octave}"
+  } else "${nameFlat[0].lowercaseChar()}b${octave}"
+
   companion object {
     fun octave(octaveIndex: Int): List<Note> {
       if (octaveIndex < 0) throw IllegalArgumentException()
