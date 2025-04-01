@@ -153,12 +153,23 @@ class SfzSampleWavGenerator {
       // Load WAV file
       val audioInputStream = AudioSystem.getAudioInputStream(sampleFile)
       val format = audioInputStream.format
-      val frameSize = format.frameSize
-      val sampleRate = format.sampleRate
-      val channels = format.channels
-      val isBigEndian = format.isBigEndian
-      val byteArray = audioInputStream.readAllBytes()
+      val targetFormat = AudioFormat(
+        AudioFormat.Encoding.PCM_SIGNED,
+        format.sampleRate,
+        16,
+        format.channels,
+        format.channels * 2,
+        format.sampleRate,
+        false
+      )
+      val convertedStream = AudioSystem.getAudioInputStream(targetFormat, audioInputStream)
+      val frameSize = convertedStream.format.frameSize
+      val sampleRate = convertedStream.format.sampleRate
+      val channels = convertedStream.format.channels
+      val isBigEndian = convertedStream.format.isBigEndian
+      val byteArray = convertedStream.readAllBytes()
       audioInputStream.close()
+      convertedStream.close()
 
       // Apply offset (in samples)
       val offsetBytes = region.offset * frameSize
